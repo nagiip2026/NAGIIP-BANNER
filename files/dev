@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+set -u
+
+r='\033[1;91m'
+g='\033[1;92m'
+y='\033[1;93m'
+c='\033[1;96m'
+n='\033[0m'
+
+clear
+echo
+echo -e "${c}                 NAGIIP SUPPORT${n}"
+echo -e "${c}              (\\_/)"
+echo -e "              (${y}^_^${c})     ${g}Report a problem${c}"
+echo -e "             ⊂(___)づ${n}"
+echo
+echo -e "${g}Write your report below. It will stay on this device; nothing is sent automatically.${n}"
+echo
+read -r -p "[+]──[Your Report]────► " report
+
+if [[ -z "$report" ]]; then
+    echo -e "${r}Report cannot be empty.${n}"
+    exit 1
+fi
+
+report_dir="$HOME/.NAGIIP"
+mkdir -p "$report_dir"
+report_file="$report_dir/last-report.txt"
+printf '%s\n' "$report" > "$report_file"
+
+echo
+echo -e "${g}Report saved locally to:${n} $report_file"
+echo -e "${c}To contact NAGIIP support, send it manually via Telegram:${n}"
+echo -e "${y}https://t.me/NAGIIP_STAR${n}"
+echo

@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""NAGIIP text packer.
+
+The command can encrypt text into a self-contained Python or shell loader,
+or decode text produced by an earlier NAGIIP invocation.
+"""
+
+import base64
+import random
+import string
+import sys
+import zlib
+
+STD_MAP = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+CUST_MAP = "Z9yX8wV7uT6sR5qP4oN3mL2kJ1iH0gFeDcBaAbCdEfGhIjKlMnOpQrStUvWxYz!@$"
+
+
+def translate(value: str, source: str, target: str) -> str:
+    return value.translate(str.maketrans(source, target))
+
+
+def encrypt_raw(text: str) -> str:
+    salt = "".join(random.choices(string.ascii_letters, k=5))
+    packed = zlib.compress(f"{salt}::{text}".encode("utf-8"))
+    encoded = base64.b64encode(packed).decode("ascii")
+    return translate(encoded, STD_MAP, CUST_MAP)
+
+
+def decrypt_raw(value: str):
+    try:
+        encoded = translate(value, CUST_MAP, STD_MAP)
+        packed = base64.b64decode(encoded)
+        text = zlib.decompress(packed).decode("utf-8")
+        return text.split("::", 1)[1]
+    except (ValueError, IndexError, UnicodeDecodeError, zlib.error):
+        return None
+
+
+def make_python_loader(encoded: str) -> str:
+    return f'''# Encrypted by NAGIIP-X
+import base64, zlib
+_enc = "{encoded}"
+_map = str.maketrans("{CUST_MAP}", "{STD_MAP}")
+exec(zlib.decompress(base64.b64decode(_enc.translate(_map))).decode("utf-8").split("::", 1)[1])
+'''
+
+
+def make_bash_loader(encoded: str) -> str:
+    reversed_value = encoded[::-1]
+    return f'''#!/bin/bash
+# NAGIIP-X secure loader
+_payload='{reversed_value}'
+_decode() {{
+    echo "$1" | rev | tr '{CUST_MAP}' '{STD_MAP}' | base64 -d |
+        python3 -c "import sys,zlib; print(zlib.decompress(sys.stdin.buffer.read()).decode('utf-8').split('::',1)[1])"
+}}
+eval "$(_decode "$_payload")"
+'''
+
+
+def main() -> int:
+    if len(sys.argv) == 2:
+        decoded = decrypt_raw(sys.argv[1])
+        if decoded is not None:
+            print(decoded)
+            return 0
+
+    if len(sys.argv) < 3:
+        print("Usage: nagiip [py|sh] 'text_or_file_content'")
+        return 1
+
+    mode, data = sys.argv[1], sys.argv[2]
+    decoded = decrypt_raw(data)
+    if decoded is not None:
+        print(decoded)
+        return 0
+
+    encoded = encrypt_raw(data)
+    if mode == "py":
+        print(make_python_loader(encoded), end="")
+    elif mode == "sh":
+        print(make_bash_loader(encoded), end="")
+    else:
+        print(encoded)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
